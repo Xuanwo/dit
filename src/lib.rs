@@ -10,6 +10,10 @@ pub struct Config {}
 
 const NEXT_ID: &str = "next_id";
 
+const INVALID_ID: u64 = 1;
+const ROOT_ID: u64 = 2;
+const FIRST_ID: u64 = 1024 + 1; // We will preserve the first 1024 of the IDs.
+
 pub struct Index {
     db: sled::Db,
     root: String,
@@ -22,12 +26,19 @@ impl Index {
         let mut idx = Index {
             db,
             root,
-            next_id: 0,
+            next_id: INVALID_ID,
         };
 
+        let next_id = idx.get_next_id().unwrap();
+        if next_id.is_some() {
+            idx.next_id = next_id.unwrap();
+        } else {
+            idx.next_id = FIRST_ID;
+        }
+
         idx.insert_item(&Item {
-            id: 2, // id should start from 2.
-            parent: 2,
+            id: ROOT_ID, // id should start from 2.
+            parent: ROOT_ID,
             name: idx.root.clone(), // Root's name is the full path.
 
             size: 0,
@@ -61,6 +72,12 @@ impl Index {
     fn set_next_id(&self, id: u64) -> Result<()> {
         self.db.insert(NEXT_ID, id.to_le_bytes().as_slice())?;
         Ok(())
+    }
+
+    fn generate_next_id(&mut self) -> u64 {
+        let id = self.next_id;
+        self.next_id += 1;
+        id
     }
 
     /// Insert an item into db: "id -> item".
